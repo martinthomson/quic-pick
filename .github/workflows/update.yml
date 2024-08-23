@@ -2,7 +2,7 @@ name: "Update Registries From IANA"
 
 on:
   schedule:
-    - cron: '53 1 * 0,4'
+    - cron: '53 1 * * 0,4'
   workflow_dispatch:
   push:
     paths: [".github/workflows/update.yml"]
