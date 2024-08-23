@@ -224,11 +224,15 @@
 </head>
 
 <body>
-  <h1>Generate Random QUIC Code Points</h1>
-  <p>If you are looking to use a new codepoint, following the rules in
+  <h1>Random Codepoint Selector</h1>
+  <p>If you are looking to use a new codepoint for a QUIC protocol, look no further.
+  <p>This understands the registries from
     <a href="https://datatracker.ietf.org/doc/html/rfc9000#section-22">Section 22</a> of
-    <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a>, this tool helps
-    by generating a fresh value.
+    <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a> and
+    <a href="https://datatracker.ietf.org/doc/html/rfc9114#section-11">Section 11</a> of
+    <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP/3</a>.
+  <p>The tool is deterministic and checks for codepoints
+    that are either reserved or already allocated.
   <table>
     <tr>
       <td>
