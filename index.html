@@ -1,13 +1,35 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>QUIC Pick</title>
   <meta name="charset" value="utf8">
   <style>
-    :root { font-family: sans-serif; }
-    input, select { padding: 2px 4px; margin: 2px 4px; }
-    td { padding: 4px 8px; }
-    optgroup { font-style: normal; }
+    :root {
+      font-family: sans-serif;
+    }
+
+    input,
+    select {
+      padding: 2px 4px;
+      margin: 2px 4px;
+    }
+
+    #field {
+      min-width: 32ch;
+    }
+
+    td {
+      padding: 4px 8px;
+    }
+
+    td:first-child {
+      min-width: 100px;
+    }
+
+    optgroup {
+      font-style: normal;
+    }
   </style>
   <script>
     const sources = {
@@ -66,7 +88,7 @@
     }
 
     async function hash(v) {
-      return await crypto.subtle.digest({name: "SHA-256"}, v);
+      return await crypto.subtle.digest({ name: "SHA-256" }, v);
     }
 
     function rng() {
@@ -76,7 +98,7 @@
       let counter = 0;
       let seed = new Uint8Array(offset + 2);
       seed.set(base, 0);
-      return async function(bits) {
+      return async function (bits) {
         seed.set([(counter >> 8) & 0xff, counter & 0xff], offset);
         const r = new Uint8Array(await hash(seed));
         let v = BigInt(r[0] >> 8 - (bits % 8));
@@ -153,8 +175,9 @@
     }
 
     async function pick() {
+      let f = el("field");
       if (el("seed").value !== "") {
-        const field = el("field").value;
+        const field = f.value;
         const rule = await rules[field];
         const bits = (rule.bits ?? 62);
         const byteElement = document.querySelector('input[name="size"]:checked');
@@ -166,13 +189,31 @@
       } else {
         el("codepoint").value = "";
       }
+
+      // Some decoration for the selector.
+      function cutLast(e) {
+        const s = e.textContent.split(": ");
+        return s[s.length - 1];
+      }
+
+      let sel = f.querySelector(":checked");
+      const s = sel.closest("optgroup").getAttribute("label") + ": " + cutLast(sel);
+      sel.textContent = s;
+
+      function cleanupLabels() {
+        for (opt of f.options) {
+          opt.textContent = cutLast(opt);
+        }
+        f.removeEventListener("click", cleanupLabels);
+      }
+      f.addEventListener("click", cleanupLabels);
     }
 
-    addEventListener("load", function() {
+    addEventListener("load", function () {
       for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8"]) {
         el(i).addEventListener("change", pick);
       }
-      el("codepoint").addEventListener("click", function(e) {
+      el("codepoint").addEventListener("click", function (e) {
         let cp = e.target;
         cp.select();
         navigator.clipboard.writeText(cp.value);
@@ -181,6 +222,7 @@
     });
   </script>
 </head>
+
 <body>
   <h1>Generate Random QUIC Code Points</h1>
   <p>If you are looking to use a new codepoint, following the rules in
@@ -193,8 +235,7 @@
         <label for="seed">Seed:</label>
       </td>
       <td>
-        <input type="text" id="seed" size="50"
-               placeholder="seed (e.g., draft-yourname-protocol-03)">
+        <input type="text" id="seed" size="50" placeholder="seed (e.g., draft-yourname-protocol-03)">
       </td>
     </tr>
     <tr>
@@ -234,10 +275,10 @@
         <label for="value">Code point:</label>
       </td>
       <td>
-        <input type="text" id="codepoint" readonly size="20"
-               placeholder="Pick a seed" title="Click to copy">
+        <input type="text" id="codepoint" readonly size="20" placeholder="Pick a seed" title="Click to copy">
       </td>
     </tr>
   </table>
 </body>
+
 </html>
