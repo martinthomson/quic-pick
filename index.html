@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>QUIC Pick</title>
+  <meta name="charset" value="utf8">
+  <style>
+    :root { font-family: sans-serif; }
+    input, select { padding: 2px 4px; margin: 2px 4px; }
+    td { padding: 4px 8px; }
+  </style>
+  <script>
+    const sources = {
+      "quic.xml": {
+        "quic-versions": "version",
+        "quic-transport": "tp",
+        "quic-frame-types": "frame",
+        "quic-transport-error-codes": "error",
+      },
+    };
+    let taken = {};
+
+    async function getTaken(n) {
+      let url = Object.keys(sources).find(s => Object.values(sources[s]).indexOf(n) >= 0);
+      if (!url) { throw `Unable to find source for ${n}`; }
+      console.log(`loading database from ${url} (for ${n})...`);
+
+      const text = await (await fetch(url)).text();
+      let xml = (new DOMParser).parseFromString(text, "text/xml");
+      for (reg of xml.documentElement.children) {
+        if (reg.localName !== "registry") { continue; }
+        const id = reg.getAttribute("id");
+        if (!id in sources) { continue; }
+
+        let values = [];
+        for (rec of reg.children) {
+          if (rec.localName === "record") {
+            for (e of rec.children) {
+              if (e.localName === "value") {
+                values.push(parseInt(e.textContent));
+              }
+            }
+          }
+        }
+        const field = sources[url][id];
+        taken[field] = values;
+        console.log(`...loaded ${values.length} values for ${field}`);
+      }
+    }
+
+    async function isTaken(v, field) {
+      if (!(field in taken)) {
+        await getTaken(field);
+      }
+      return taken[field].some(t => BigInt(t) === v);
+    }
+
+    function el(i) {
+      return document.getElementById(i);
+    }
+
+    async function hash(v) {
+      return await crypto.subtle.digest({name: "SHA-256"}, v);
+    }
+
+    function rng() {
+      const s = "quic-pick-" + el("seed").value;
+      let base = (new TextEncoder()).encode(s);
+      const offset = base.length;
+      let counter = 0;
+      let seed = new Uint8Array(offset + 2);
+      seed.set(base, 0);
+      return async function(bits) {
+        seed.set([(counter >> 8) & 0xff, counter & 0xff], offset);
+        const r = new Uint8Array(await hash(seed));
+        let v = BigInt(r[0] >> 8 - (bits % 8));
+        let i = 1;
+        for (let bytes = (bits - 1) >> 3; bytes > 0; --bytes) {
+          v = (v << 8n) | BigInt(r[i++]);
+        }
+        counter++;
+        return v;
+      };
+    }
+
+    async function version(r, _bytes) {
+      // A QUIC version number.
+      r ??= rng();
+      let v;
+      do {
+        v = await r(32);
+      } while ((v & 0x0f0f0f0fn) === 0x0a0a0a0an);
+      return v;
+    }
+
+    async function vi62(r, bytes) {
+      // An unfiltered QUIC varint.
+      r ??= rng();
+      const shift = BigInt((bytes >> 1) * 8 - 2);
+      let v;
+      do {
+        v = await r(bytes * 8 - 2);
+      } while (v < (1n << shift));
+      return v;
+    }
+
+    async function vi62g27mod31(r, bytes) {
+      // A 62-bit QUIC varint, except those equal to 27 mod 31.
+      r ??= rng();
+      let v;
+      do {
+        v = await vi62(r, bytes);
+      } while (v % 31n === 27n);
+      return v;
+    }
+
+    const rules = {
+      version: { r: version, bits: 32 },
+      tp: { r: vi62g27mod31 },
+      frame: { r: vi62 },
+      error: { r: vi62 },
+    };
+
+    async function draw(f, bytes, field) {
+      let r = rng();
+      for (let i = 0; i < 20; ++i) {
+        const v = await f(r, bytes);
+        const taken = await isTaken(v, field);
+        console.log(`draw for ${field}: ${v.toString(16)} (taken: ${taken})`);
+        if (!taken) {
+          return v;
+        }
+      }
+      throw `failed to generate a value for ${field}`;
+    }
+
+    async function pick() {
+      if (el("seed").value !== "") {
+        const field = el("field").value;
+        const rule = await rules[field];
+        const bits = (rule.bits ?? 62);
+        const bytes = parseInt(document.querySelector('input[name="size"]:checked').value, 10);
+        const v = await draw(rule.r, bytes, field);
+        const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
+        el("codepoint").value = "0x" + vstr;
+        el("size-row").style.display = (bits === 62) ? "table-row" : "none";
+      } else {
+        el("codepoint").value = "";
+      }
+    }
+
+    addEventListener("load", function() {
+      for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8"]) {
+        el(i).addEventListener("change", pick);
+      }
+      el("codepoint").addEventListener("click", function(e) {
+        let cp = e.target;
+        cp.select();
+        navigator.clipboard.writeText(cp.value);
+      });
+      pick();
+    });
+  </script>
+</head>
+<body>
+  <h1>Generate Random QUIC Code Points</h1>
+  <p>If you are looking to use a new codepoint, following the rules in
+    <a href="https://datatracker.ietf.org/doc/html/rfc9000#section-22">Section 22</a> of
+    <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a>, this tool helps
+    by generating a fresh value.
+  <table>
+    <tr>
+      <td>
+        <label for="seed">Seed:</label>
+      </td>
+      <td>
+        <input type="text" id="seed" size="50"
+               placeholder="seed (e.g., draft-yourname-protocol-03)">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label for="field">Type of field:</label>
+      </td>
+      <td>
+        <select id="field" name="field">
+          <option value="version">Version</option>
+          <option value="tp">Transport Parameter</option>
+          <option value="frame">Frame Type</option>
+          <option value="error">Error Code</option>
+        </select>
+      </td>
+    </tr>
+    <tr id="size-row">
+      <td>
+        Encoded size:
+      </td>
+      <td>
+        <input type="radio" name="size" id="size-1" value="1"><label for="size-1">One byte</label><br>
+        <input type="radio" name="size" id="size-2" value="2"><label for="size-2">Two bytes</label><br>
+        <input type="radio" name="size" id="size-4" value="4"><label for="size-4">Four bytes</label><br>
+        <input type="radio" name="size" id="size-8" value="8" checked><label for="size-8">Eight bytes</label>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label for="value">Code point:</label>
+      </td>
+      <td>
+        <input type="text" id="codepoint" readonly size="20"
+               placeholder="Pick a seed" title="Click to copy">
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,24 @@
+name: "Update Registries From IANA"
+
+on:
+  schedule:
+    - cron: '53 1 * 0,4'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: "Update Copies of IANA Registries"
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v4
+    - name: "Download Registries"
+      run: |
+        curl -sSLf https://www.iana.org/assignments/quic/quic.xml -o quic.xml
+        curl -sSLf https://www.iana.org/assignments/http3-parameters/http3-parameters.xml -o h3.xml
+    - name: "Commit Changes"
+      run: |
+        if [ -z "$(git status --porcelain)" ]; then
+          git commit -m "Update registry" quic.xml h3.xml
+          git push
+        fi
