@@ -7,6 +7,7 @@
     :root { font-family: sans-serif; }
     input, select { padding: 2px 4px; margin: 2px 4px; }
     td { padding: 4px 8px; }
+    optgroup { font-style: normal; }
   </style>
   <script>
     const sources = {
@@ -15,6 +16,12 @@
         "quic-transport": "tp",
         "quic-frame-types": "frame",
         "quic-transport-error-codes": "error",
+      },
+      "h3.xml": {
+        "http3-parameters-frame-types": "h3frame",
+        "http3-parameters-settings": "h3setting",
+        "http3-parameters-error-codes": "h3error",
+        "http3-parameters-stream-types": "h3stream",
       },
     };
     let taken = {};
@@ -103,14 +110,22 @@
       return v;
     }
 
-    async function vi62g27mod31(r, bytes) {
-      // A 62-bit QUIC varint, except those equal to 27 mod 31.
-      r ??= rng();
+    async function vi62gmod(r, bytes, rem, div) {
+      // A 62-bit QUIC varint, except those equal to $rem mod $div,
+      // except for any value that is less than $rem (so 2 is ok for 33 mod 31).
       let v;
       do {
         v = await vi62(r, bytes);
-      } while (v % 31n === 27n);
+      } while (v % div === rem % div && v >= rem);
       return v;
+    }
+
+    async function vi62g2mod31(r, bytes) {
+      return await vi62gmod(r, bytes, 33n, 31n);
+    }
+
+    async function vi62g27mod31(r, bytes) {
+      return await vi62gmod(r, bytes, 27n, 31n);
     }
 
     const rules = {
@@ -118,6 +133,10 @@
       tp: { r: vi62g27mod31 },
       frame: { r: vi62 },
       error: { r: vi62 },
+      h3frame: { r: vi62g2mod31 },
+      h3setting: { r: vi62g2mod31 },
+      h3error: { r: vi62g2mod31 },
+      h3stream: { r: vi62g2mod31 },
     };
 
     async function draw(f, bytes, field) {
@@ -138,7 +157,8 @@
         const field = el("field").value;
         const rule = await rules[field];
         const bits = (rule.bits ?? 62);
-        const bytes = parseInt(document.querySelector('input[name="size"]:checked').value, 10);
+        const byteElement = document.querySelector('input[name="size"]:checked');
+        const bytes = parseInt(byteElement.value, 10);
         const v = await draw(rule.r, bytes, field);
         const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
         el("codepoint").value = "0x" + vstr;
@@ -183,10 +203,18 @@
       </td>
       <td>
         <select id="field" name="field">
-          <option value="version">Version</option>
-          <option value="tp">Transport Parameter</option>
-          <option value="frame">Frame Type</option>
-          <option value="error">Error Code</option>
+          <optgroup label="QUIC">
+            <option value="version">Version</option>
+            <option value="tp">Transport Parameter</option>
+            <option value="frame">Frame</option>
+            <option value="error">Error Code</option>
+          </optgroup>
+          <optgroup label="HTTP/3">
+            <option value="h3frame">Frame</option>
+            <option value="h3setting">Setting</option>
+            <option value="h3error">Error Code</option>
+            <option value="h3stream">Stream</option>
+          </optgroup>
         </select>
       </td>
     </tr>
