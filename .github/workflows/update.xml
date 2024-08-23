@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: '53 1 * 0,4'
   workflow_dispatch:
+  push:
+    paths: [".github/workflows/update.yml"]
 
 jobs:
   build:
@@ -18,7 +20,7 @@ jobs:
         curl -sSLf https://www.iana.org/assignments/http3-parameters/http3-parameters.xml -o h3.xml
     - name: "Commit Changes"
       run: |
-        if [ -z "$(git status --porcelain)" ]; then
+        if [ -n "$(git status --porcelain)" ]; then
           git commit -m "Update registry" quic.xml h3.xml
           git push
         fi
