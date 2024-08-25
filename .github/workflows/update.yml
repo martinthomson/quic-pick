@@ -18,9 +18,10 @@ jobs:
       run: |
         curl -sSLf https://www.iana.org/assignments/quic/quic.xml -o quic.xml
         curl -sSLf https://www.iana.org/assignments/http3-parameters/http3-parameters.xml -o h3.xml
+        curl -sSLf https://www.iana.org/assignments/masque/masque.xml -o masque.xml
     - name: "Commit Changes"
       run: |
         if [ -n "$(git status --porcelain)" ]; then
-          git commit -m "Update registry" quic.xml h3.xml
+          git commit -m "Update registry" quic.xml h3.xml masque.xml
           git push
         fi

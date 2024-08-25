@@ -45,6 +45,9 @@
         "http3-parameters-error-codes": "h3error",
         "http3-parameters-stream-types": "h3stream",
       },
+      "masque.xml": {
+        "http-capsule-types": "capsule"
+      },
     };
     let taken = {};
 
@@ -150,6 +153,10 @@
       return await vi62gmod(r, bytes, 27n, 31n);
     }
 
+    async function vi62g27mod41(r, bytes) {
+      return await vi62gmod(r, bytes, 27n, 31n);
+    }
+
     const rules = {
       version: { r: version, bits: 32 },
       tp: { r: vi62g27mod31 },
@@ -159,6 +166,7 @@
       h3setting: { r: vi62g2mod31 },
       h3error: { r: vi62g2mod31 },
       h3stream: { r: vi62g2mod31 },
+      capsule: { r: vi62g27mod41 },
     };
 
     async function draw(f, bytes, field) {
@@ -225,12 +233,14 @@
 
 <body>
   <h1>Random Codepoint Selector</h1>
-  <p>If you are looking to use a new codepoint for a QUIC protocol, look no further.
+  <p>If you are looking to use a new codepoint for a protocol, look no further.
   <p>This understands the registries from
     <a href="https://datatracker.ietf.org/doc/html/rfc9000#section-22">Section 22</a> of
-    <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a> and
+    <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a>,
     <a href="https://datatracker.ietf.org/doc/html/rfc9114#section-11">Section 11</a> of
-    <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP/3</a>.
+    <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP/3</a>, and 
+    <a href="https://datatracker.ietf.org/doc/html/rfc9297#section-5.4">Section 5.4</a> of
+    <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP Datagrams and the Capsule Protocol</a>.
   <p>The tool is deterministic and checks for codepoints
     that are either reserved or already allocated.
   <table>
@@ -254,11 +264,12 @@
             <option value="frame">Frame</option>
             <option value="error">Error Code</option>
           </optgroup>
-          <optgroup label="HTTP/3">
-            <option value="h3frame">Frame</option>
-            <option value="h3setting">Setting</option>
-            <option value="h3error">Error Code</option>
-            <option value="h3stream">Stream</option>
+          <optgroup label="HTTP">
+            <option value="h3frame">HTTP/3 Frame</option>
+            <option value="h3setting">HTTP/3 Setting</option>
+            <option value="h3error">HTTP/3 Error Code</option>
+            <option value="h3stream">HTTP/3 Stream</option>
+            <option value="capsule">HTTP Capsule</option>
           </optgroup>
         </select>
       </td>
