@@ -156,8 +156,8 @@
       return await vi62gmod(r, bytes, 27n, 31n);
     }
 
-    async function vi62g27mod41(r, bytes) {
-      return await vi62gmod(r, bytes, 27n, 31n);
+    async function vi62g23mod41(r, bytes) {
+      return await vi62gmod(r, bytes, 23n, 41n);
     }
 
     const rules = {
@@ -169,7 +169,7 @@
       h3setting: { r: vi62g2mod31 },
       h3error: { r: vi62g2mod31 },
       h3stream: { r: vi62g2mod31 },
-      capsule: { r: vi62g27mod41 },
+      capsule: { r: vi62g23mod41 },
     };
 
     async function draw(f, bytes, field) {
