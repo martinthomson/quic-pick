@@ -65,7 +65,10 @@
           if (rec.localName === "record") {
             for (e of rec.children) {
               if (e.localName === "value") {
-                values.push(parseInt(e.textContent));
+                let [start, end] = e.textContent.trim().split("-").map(v => parseInt(v));
+                do {
+                  values.push(start++);
+                } while (start < end ?? start);
               }
             }
           }
