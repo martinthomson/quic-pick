@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
   <title>QUIC Pick</title>
   <meta charset="utf8">
@@ -62,14 +61,14 @@
       for (reg of xml.documentElement.children) {
         if (reg.localName !== "registry") { continue; }
         const id = reg.getAttribute("id");
-        if (!id in sources) { continue; }
+        if (!(id in sources[url])) { continue; }
 
         let values = [];
         for (rec of reg.children) {
           if (rec.localName === "record") {
             for (e of rec.children) {
               if (e.localName === "value") {
-                let [start, end] = e.textContent.trim().split("-").map(v => parseInt(v));
+                let [start, end] = e.textContent.trim().split("-").map(v => BigInt(v));
                 do {
                   values.push(start++);
                 } while (start < end ?? start);
@@ -87,7 +86,7 @@
       if (!(field in taken)) {
         await getTaken(field);
       }
-      return taken[field].some(t => BigInt(t) === v);
+      return taken[field].indexOf(v) >= 0;
     }
 
     function el(i) {
