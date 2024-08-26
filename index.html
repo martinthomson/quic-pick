@@ -68,7 +68,10 @@
           if (rec.localName === "record") {
             for (e of rec.children) {
               if (e.localName === "value") {
-                values.push(parseInt(e.textContent));
+                let [start, end] = e.textContent.trim().split("-").map(v => parseInt(v));
+                do {
+                  values.push(start++);
+                } while (start < end ?? start);
               }
             }
           }
@@ -205,16 +208,19 @@
       }
 
       let sel = f.querySelector(":checked");
-      const s = sel.closest("optgroup").getAttribute("label") + ": " + cutLast(sel);
-      sel.textContent = s;
+      const group = sel.closest("optgroup");
+      if (group) {
+        const s = group.getAttribute("label") + ": " + cutLast(sel);
+        sel.textContent = s;
 
-      function cleanupLabels() {
-        for (opt of f.options) {
-          opt.textContent = cutLast(opt);
+        function cleanupLabels() {
+          for (opt of f.options) {
+            opt.textContent = cutLast(opt);
+          }
+          f.removeEventListener("click", cleanupLabels);
         }
-        f.removeEventListener("click", cleanupLabels);
+        f.addEventListener("click", cleanupLabels);
       }
-      f.addEventListener("click", cleanupLabels);
     }
 
     addEventListener("load", function () {
@@ -297,4 +303,5 @@
   <p>The source code for this page is available on <a href="https://github.com/martinthomson/quic-pick">GitHub</a>.
     Suggestions or fixes can be made there.
 </body>
+
 </html>
