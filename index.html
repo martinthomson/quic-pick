@@ -108,7 +108,8 @@
       return async function (bits) {
         seed.set([(counter >> 8) & 0xff, counter & 0xff], offset);
         const r = new Uint8Array(await hash(seed));
-        let v = BigInt(r[0] >> 8 - (bits % 8));
+        const shift = 8 - (bits % 8);
+        let v = BigInt((shift === 8) ? r[0] : r[0] >> shift);
         let i = 1;
         for (let bytes = (bits - 1) >> 3; bytes > 0; --bytes) {
           v = (v << 8n) | BigInt(r[i++]);
