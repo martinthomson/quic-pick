@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>QUIC Pick</title>
   <meta charset="utf8">
@@ -248,8 +249,8 @@
     <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP/3</a>, and
     <a href="https://datatracker.ietf.org/doc/html/rfc9297#section-5.4">Section 5.4</a> of
     <a href="https://datatracker.ietf.org/doc/html/rfc9297">HTTP Datagrams and the Capsule Protocol</a>.
-  <p>The tool is deterministic and checks for codepoints
-    that are either reserved or already allocated.
+  <p>The selection avoids selecting codepoints that are either reserved or already allocated.
+    The process is deterministic, which also means that it is verifiable.
   <table>
     <tr>
       <td>
