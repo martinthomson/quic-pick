@@ -16,6 +16,10 @@
       margin: 2px 4px;
     }
 
+    input.error {
+      background-color: #faa;
+    }
+
     #field {
       min-width: 32ch;
     }
@@ -175,32 +179,43 @@
     };
 
     async function draw(f, bytes, field) {
+      const tries = 32;
       let r = rng();
-      for (let i = 0; i < 20; ++i) {
+      for (let i = 0; i < tries; ++i) {
         const v = await f(r, bytes);
         const taken = await isTaken(v, field);
-        console.log(`draw for ${field}: ${v.toString(16)} (taken: ${taken})`);
+        console.log(`draw ${i + 1} for ${field}: ${v.toString(16)} (taken: ${taken})`);
         if (!taken) {
           return v;
         }
       }
-      throw `failed to generate a value for ${field}`;
+      throw `failed to generate a value for ${field} after ${tries} draws`;
     }
 
     async function pick() {
       let f = el("field");
+      let cp = el("codepoint");
+      cp.classList.remove("error");
       if (el("seed").value !== "") {
         const field = f.value;
         const rule = await rules[field];
         const bits = (rule.bits ?? 62);
         const byteElement = document.querySelector('input[name="size"]:checked');
         const bytes = parseInt(byteElement.value, 10);
-        const v = await draw(rule.r, bytes, field);
-        const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
-        el("codepoint").value = "0x" + vstr;
-        el("size-row").style.display = (bits === 62) ? "table-row" : "none";
+
+        try {
+          const v = await draw(rule.r, bytes, field);
+          const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
+          cp.value = "0x" + vstr;
+          el("size-row").style.display = (bits === 62) ? "table-row" : "none";
+        } catch (e) {
+          console.log(e);
+          cp.classList.add("error");
+          cp.value = "error"
+          cp.title = e.toString();
+        }
       } else {
-        el("codepoint").value = "";
+        cp.value = "";
       }
 
       // Some decoration for the selector.
