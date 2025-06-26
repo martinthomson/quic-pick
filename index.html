@@ -35,223 +35,20 @@
     optgroup {
       font-style: normal;
     }
+
+    a#permalink[href] {
+      text-decoration: none;
+    }
+
+    a#permalink:not([href]) {
+      visibility: hidden;
+    }
+
+    #changewarning {
+      padding: 0 5px;
+      background-color: #faa;
+    }
   </style>
-  <script>
-    const sources = {
-      "quic.xml": {
-        "quic-versions": "version",
-        "quic-transport": "tp",
-        "quic-frame-types": "frame",
-        "quic-transport-error-codes": "error",
-      },
-      "h3.xml": {
-        "http3-parameters-frame-types": "h3frame",
-        "http3-parameters-settings": "h3setting",
-        "http3-parameters-error-codes": "h3error",
-        "http3-parameters-stream-types": "h3stream",
-      },
-      "masque.xml": {
-        "http-capsule-types": "capsule",
-      },
-    };
-    let taken = {};
-
-    async function getTaken(n) {
-      let url = Object.keys(sources).find(s => Object.values(sources[s]).indexOf(n) >= 0);
-      if (!url) { throw `Unable to find source for ${n}`; }
-      console.log(`loading database from ${url} (for ${n})...`);
-
-      const text = await (await fetch(url)).text();
-      let xml = (new DOMParser).parseFromString(text, "text/xml");
-      for (reg of xml.documentElement.children) {
-        if (reg.localName !== "registry") { continue; }
-        const id = reg.getAttribute("id");
-        if (!(id in sources[url])) { continue; }
-
-        let values = [];
-        for (rec of reg.children) {
-          if (rec.localName === "record") {
-            for (e of rec.children) {
-              if (e.localName === "value") {
-                let [start, end] = e.textContent.trim().split("-").map(v => BigInt(v));
-                do {
-                  values.push(start++);
-                } while (start < end ?? start);
-              }
-            }
-          }
-        }
-        const field = sources[url][id];
-        taken[field] = values;
-        console.log(`...loaded ${values.length} values for ${field}`);
-      }
-    }
-
-    async function isTaken(v, field) {
-      if (!(field in taken)) {
-        await getTaken(field);
-      }
-      return taken[field].indexOf(v) >= 0;
-    }
-
-    function el(i) {
-      return document.getElementById(i);
-    }
-
-    async function hash(v) {
-      return await crypto.subtle.digest({ name: "SHA-256" }, v);
-    }
-
-    function rng() {
-      const s = "quic-pick-" + el("seed").value;
-      let base = (new TextEncoder()).encode(s);
-      const offset = base.length;
-      let counter = 0;
-      let seed = new Uint8Array(offset + 2);
-      seed.set(base, 0);
-      return async function (bits) {
-        seed.set([(counter >> 8) & 0xff, counter & 0xff], offset);
-        const r = new Uint8Array(await hash(seed));
-        const shift = 8 - (bits % 8);
-        let v = BigInt((shift === 8) ? r[0] : r[0] >> shift);
-        let i = 1;
-        for (let bytes = (bits - 1) >> 3; bytes > 0; --bytes) {
-          v = (v << 8n) | BigInt(r[i++]);
-        }
-        counter++;
-        return v;
-      };
-    }
-
-    async function version(r, _bytes) {
-      // A QUIC version number.
-      r ??= rng();
-      let v;
-      do {
-        v = await r(32);
-      } while ((v & 0x0f0f0f0fn) === 0x0a0a0a0an);
-      return v;
-    }
-
-    async function vi62(r, bytes) {
-      // An unfiltered QUIC varint.
-      r ??= rng();
-      const shift = BigInt((bytes >> 1) * 8 - 2);
-      let v;
-      do {
-        v = await r(bytes * 8 - 2);
-      } while (v < (1n << shift));
-      return v;
-    }
-
-    async function vi62gmod(r, bytes, rem, div) {
-      // A 62-bit QUIC varint, except those equal to $rem mod $div,
-      // except for any value that is less than $rem (so 2 is ok for 33 mod 31).
-      let v;
-      do {
-        v = await vi62(r, bytes);
-      } while (v % div === rem % div && v >= rem);
-      return v;
-    }
-
-    async function vi62g2mod31(r, bytes) {
-      return await vi62gmod(r, bytes, 33n, 31n);
-    }
-
-    async function vi62g27mod31(r, bytes) {
-      return await vi62gmod(r, bytes, 27n, 31n);
-    }
-
-    async function vi62g23mod41(r, bytes) {
-      return await vi62gmod(r, bytes, 23n, 41n);
-    }
-
-    const rules = {
-      version: { r: version, bits: 32 },
-      tp: { r: vi62g27mod31 },
-      frame: { r: vi62 },
-      error: { r: vi62 },
-      h3frame: { r: vi62g2mod31 },
-      h3setting: { r: vi62g2mod31 },
-      h3error: { r: vi62g2mod31 },
-      h3stream: { r: vi62g2mod31 },
-      capsule: { r: vi62g23mod41 },
-    };
-
-    async function draw(f, bytes, field) {
-      const tries = 32;
-      let r = rng();
-      for (let i = 0; i < tries; ++i) {
-        const v = await f(r, bytes);
-        const taken = await isTaken(v, field);
-        console.log(`draw ${i + 1} for ${field}: ${v.toString(16)} (taken: ${taken})`);
-        if (!taken) {
-          return v;
-        }
-      }
-      throw `failed to generate a value for ${field} after ${tries} draws`;
-    }
-
-    async function pick() {
-      let f = el("field");
-      let cp = el("codepoint");
-      cp.classList.remove("error");
-      if (el("seed").value !== "") {
-        const field = f.value;
-        const rule = await rules[field];
-        const bits = (rule.bits ?? 62);
-        const byteElement = document.querySelector('input[name="size"]:checked');
-        const bytes = parseInt(byteElement.value, 10);
-
-        try {
-          const v = await draw(rule.r, bytes, field);
-          const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
-          cp.value = "0x" + vstr;
-          el("size-row").style.display = (bits === 62) ? "table-row" : "none";
-        } catch (e) {
-          console.log(e);
-          cp.classList.add("error");
-          cp.value = "error"
-          cp.title = e.toString();
-        }
-      } else {
-        cp.value = "";
-      }
-
-      // Some decoration for the selector.
-      function cutLast(e) {
-        const s = e.textContent.split(": ");
-        return s[s.length - 1];
-      }
-
-      let sel = f.querySelector(":checked");
-      const group = sel.closest("optgroup");
-      if (group) {
-        const s = group.getAttribute("label") + ": " + cutLast(sel);
-        sel.textContent = s;
-
-        function cleanupLabels() {
-          for (opt of f.options) {
-            opt.textContent = cutLast(opt);
-          }
-          f.removeEventListener("click", cleanupLabels);
-        }
-        f.addEventListener("click", cleanupLabels);
-      }
-    }
-
-    addEventListener("load", function () {
-      for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8"]) {
-        el(i).addEventListener("change", pick);
-      }
-      el("codepoint").addEventListener("click", function (e) {
-        let cp = e.target;
-        cp.select();
-        navigator.clipboard.writeText(cp.value);
-      });
-      pick();
-    });
-  </script>
 </head>
 
 <body>
@@ -313,12 +110,280 @@
         <label for="value">Code point:</label>
       </td>
       <td>
-        <input type="text" id="codepoint" readonly size="20" placeholder="Pick a seed" title="Click to copy">
+        <input type="text" id="codepoint" readonly size="20" placeholder="Pick a seed" title="Click to copy codepoint">
+        <a id="permalink" title="Link to this configuration">🔗</a>
+        <span id="changewarning" style="display: none;">⚠️value updated⚠️</span>
       </td>
     </tr>
   </table>
   <p>The source code for this page is available on <a href="https://github.com/martinthomson/quic-pick">GitHub</a>.
     Suggestions or fixes can be made there.
 </body>
+<script>
+  const sources = {
+    "quic.xml": {
+      "quic-versions": "version",
+      "quic-transport": "tp",
+      "quic-frame-types": "frame",
+      "quic-transport-error-codes": "error",
+    },
+    "h3.xml": {
+      "http3-parameters-frame-types": "h3frame",
+      "http3-parameters-settings": "h3setting",
+      "http3-parameters-error-codes": "h3error",
+      "http3-parameters-stream-types": "h3stream",
+    },
+    "masque.xml": {
+      "http-capsule-types": "capsule",
+    },
+  };
+  let taken = {};
+  let urlcodepoint = null;
+
+  async function getTaken(n) {
+    let url = Object.keys(sources).find(s => Object.values(sources[s]).indexOf(n) >= 0);
+    if (!url) { throw `Unable to find source for ${n}`; }
+    console.log(`loading database from ${url} (for ${n})...`);
+
+    const text = await (await fetch(url)).text();
+    let xml = (new DOMParser).parseFromString(text, "text/xml");
+    for (reg of xml.documentElement.children) {
+      if (reg.localName !== "registry") { continue; }
+      const id = reg.getAttribute("id");
+      if (!(id in sources[url])) { continue; }
+
+      let values = [];
+      for (rec of reg.children) {
+        if (rec.localName === "record") {
+          for (e of rec.children) {
+            if (e.localName === "value") {
+              let [start, end] = e.textContent.trim().split("-").map(v => BigInt(v));
+              do {
+                values.push(start++);
+              } while (start < end ?? start);
+            }
+          }
+        }
+      }
+      const field = sources[url][id];
+      taken[field] = values;
+      console.log(`...loaded ${values.length} values for ${field}`);
+    }
+  }
+
+  async function isTaken(v, field) {
+    if (!(field in taken)) {
+      await getTaken(field);
+    }
+    return taken[field].indexOf(v) >= 0;
+  }
+
+  function el(i) {
+    return document.getElementById(i);
+  }
+
+  async function hash(v) {
+    return await crypto.subtle.digest({ name: "SHA-256" }, v);
+  }
+
+  function rng() {
+    const s = "quic-pick-" + el("seed").value;
+    let base = (new TextEncoder()).encode(s);
+    const offset = base.length;
+    let counter = 0;
+    let seed = new Uint8Array(offset + 2);
+    seed.set(base, 0);
+    return async function (bits) {
+      seed.set([(counter >> 8) & 0xff, counter & 0xff], offset);
+      const r = new Uint8Array(await hash(seed));
+      const shift = 8 - (bits % 8);
+      let v = BigInt((shift === 8) ? r[0] : r[0] >> shift);
+      let i = 1;
+      for (let bytes = (bits - 1) >> 3; bytes > 0; --bytes) {
+        v = (v << 8n) | BigInt(r[i++]);
+      }
+      counter++;
+      return v;
+    };
+  }
+
+  async function version(r, _bytes) {
+    // A QUIC version number.
+    r ??= rng();
+    let v;
+    do {
+      v = await r(32);
+    } while ((v & 0x0f0f0f0fn) === 0x0a0a0a0an);
+    return v;
+  }
+
+  async function vi62(r, bytes) {
+    // An unfiltered QUIC varint.
+    r ??= rng();
+    const shift = BigInt((bytes >> 1) * 8 - 2);
+    let v;
+    do {
+      v = await r(bytes * 8 - 2);
+    } while (v < (1n << shift));
+    return v;
+  }
+
+  async function vi62gmod(r, bytes, rem, div) {
+    // A 62-bit QUIC varint, except those equal to $rem mod $div,
+    // except for any value that is less than $rem (so 2 is ok for 33 mod 31).
+    let v;
+    do {
+      v = await vi62(r, bytes);
+    } while (v % div === rem % div && v >= rem);
+    return v;
+  }
+
+  async function vi62g2mod31(r, bytes) {
+    return await vi62gmod(r, bytes, 33n, 31n);
+  }
+
+  async function vi62g27mod31(r, bytes) {
+    return await vi62gmod(r, bytes, 27n, 31n);
+  }
+
+  async function vi62g23mod41(r, bytes) {
+    return await vi62gmod(r, bytes, 23n, 41n);
+  }
+
+  const rules = {
+    version: { r: version, bits: 32 },
+    tp: { r: vi62g27mod31 },
+    frame: { r: vi62 },
+    error: { r: vi62 },
+    h3frame: { r: vi62g2mod31 },
+    h3setting: { r: vi62g2mod31 },
+    h3error: { r: vi62g2mod31 },
+    h3stream: { r: vi62g2mod31 },
+    capsule: { r: vi62g23mod41 },
+  };
+
+  async function draw(f, bytes, field) {
+    const tries = 32;
+    let r = rng();
+    for (let i = 0; i < tries; ++i) {
+      const v = await f(r, bytes);
+      const taken = await isTaken(v, field);
+      console.log(`draw ${i + 1} for ${field}: ${v.toString(16)} (taken: ${taken})`);
+      if (!taken) {
+        return v;
+      }
+    }
+    throw `failed to generate a value for ${field} after ${tries} draws`;
+  }
+
+  function updateDecoration(bits, value) {
+    const varint = bits === 62;
+
+    let permalink = window.location.origin + window.location.pathname + "#" +
+      ["seed", "field", "codepoint"].map(k => `${k}=${el(k).value}`).join(";");
+    if (varint) {
+      permalink += ";size=" + document.querySelector('input[name="size"]:checked').value;
+    }
+    el("permalink").href = permalink;
+
+    if (urlcodepoint) {
+      el("changewarning").style.display = (value !== urlcodepoint) ? "inline" : "none";
+      urlcodepoint = null;
+    }
+
+    el("size-row").style.display = varint ? "table-row" : "none";
+  }
+
+  async function pick() {
+    let f = el("field");
+    let cp = el("codepoint");
+    cp.classList.remove("error");
+    if (el("seed").value !== "") {
+      const field = f.value;
+      const rule = await rules[field];
+      const bits = (rule.bits ?? 62);
+      const byteElement = document.querySelector('input[name="size"]:checked');
+      const bytes = parseInt(byteElement.value, 10);
+
+      try {
+        const v = await draw(rule.r, bytes, field);
+        const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
+        cp.value = "0x" + vstr;
+        updateDecoration(bits, cp.value);
+      } catch (e) {
+        console.warn(e);
+        cp.classList.add("error");
+        cp.value = "error"
+        cp.title = e.toString();
+      }
+    } else {
+      cp.value = "";
+    }
+
+    // Some decoration for the selector.
+    function cutLast(e) {
+      const s = e.textContent.split(": ");
+      return s[s.length - 1];
+    }
+
+    let sel = f.querySelector(":checked");
+    const group = sel.closest("optgroup");
+    if (group) {
+      const s = group.getAttribute("label") + ": " + cutLast(sel);
+      sel.textContent = s;
+
+      function cleanupLabels() {
+        for (opt of f.options) {
+          opt.textContent = cutLast(opt);
+        }
+        f.removeEventListener("click", cleanupLabels);
+      }
+      f.addEventListener("click", cleanupLabels);
+    }
+  }
+
+  function loadHash() {
+    window.location.hash.substring(1).split(";").forEach(kv => {
+      const [k, v] = kv.split("=", 2);
+      if (k == "size") {
+        let e = el(`size-${v}`);
+        if (e) {
+          e.checked = true;
+        }
+      } else {
+        let e = el(k);
+        if (e && v) {
+          e.value = v;
+          if (k == "codepoint") {
+            urlcodepoint = v;
+          }
+        }
+      }
+    });
+  }
+
+  addEventListener("load", e => {
+    loadHash();
+    pick();
+
+    window.addEventListener("hashchange", e => {
+      loadHash();
+      pick();
+    });
+
+    el("permalink").addEventListener("click", e => {
+      navigator.clipboard.writeText(e.target.href);
+    });
+
+    for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8"]) {
+      el(i).addEventListener("change", pick);
+    }
+    el("codepoint").addEventListener("click", e => {
+      let cp = e.target;
+      cp.select();
+      navigator.clipboard.writeText(cp.value);
+    });
+  });
+</script>
 
 </html>
