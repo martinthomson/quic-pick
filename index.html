@@ -307,7 +307,8 @@
 
       try {
         const v = await draw(rule.r, bytes, field);
-        const vstr = v.toString(16).padStart(Math.ceil(bits / 4), "0");
+        let padlen = (bits === 62) ? (bytes * 2) : Math.ceil(bits / 4);
+        const vstr = v.toString(16).padStart(padlen, "0");
         cp.value = "0x" + vstr;
         updateDecoration(bits, cp.value);
       } catch (e) {
