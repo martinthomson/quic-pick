@@ -141,12 +141,12 @@
   let urlcodepoint = null;
 
   async function getTaken(n) {
-    let url = Object.keys(sources).find(s => Object.values(sources[s]).indexOf(n) >= 0);
+    const url = Object.keys(sources).find(s => Object.values(sources[s]).indexOf(n) >= 0);
     if (!url) { throw `Unable to find source for ${n}`; }
     console.log(`loading database from ${url} (for ${n})...`);
 
     const text = await (await fetch(url)).text();
-    let xml = (new DOMParser).parseFromString(text, "text/xml");
+    const xml = (new DOMParser).parseFromString(text, "text/xml");
     for (reg of xml.documentElement.children) {
       if (reg.localName !== "registry") { continue; }
       const id = reg.getAttribute("id");
@@ -188,7 +188,7 @@
 
   function rng() {
     const s = "quic-pick-" + el("seed").value;
-    let base = (new TextEncoder()).encode(s);
+    const base = (new TextEncoder()).encode(s);
     const offset = base.length;
     let counter = 0;
     let seed = new Uint8Array(offset + 2);
@@ -307,7 +307,7 @@
 
       try {
         const v = await draw(rule.r, bytes, field);
-        let padlen = (bits === 62) ? (bytes * 2) : Math.ceil(bits / 4);
+        const padlen = (bits === 62) ? (bytes * 2) : Math.ceil(bits / 4);
         const vstr = v.toString(16).padStart(padlen, "0");
         cp.value = "0x" + vstr;
         updateDecoration(bits, cp.value);
@@ -346,7 +346,8 @@
   function loadHash() {
     window.location.hash.substring(1).split(";").forEach(kv => {
       const [k, v] = kv.split("=", 2);
-      if (k == "size") {
+      if (!k || !v) { return; }
+      if (k === "size") {
         let e = el(`size-${v}`);
         if (e) {
           e.checked = true;
@@ -355,7 +356,7 @@
         let e = el(k);
         if (e && v) {
           e.value = v;
-          if (k == "codepoint") {
+          if (k === "codepoint") {
             urlcodepoint = v;
           }
         }
