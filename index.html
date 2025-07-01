@@ -37,11 +37,11 @@
       font-style: normal;
     }
 
-    a#permalink[href] {
+    a#permalink[href^="h"] {
       text-decoration: none;
     }
 
-    a#permalink:not([href]) {
+    a#permalink:not([href^="h"]) {
       visibility: hidden;
     }
 
@@ -276,6 +276,12 @@
     throw `failed to generate a value for ${field} after ${tries} draws`;
   }
 
+  function resetDecoration(cp) {
+    cp.classList.remove("error");
+    el("changewarning").style.display = "none";
+    el("permalink").href = "";
+  }
+
   function updateDecoration(bits, value) {
     const varint = bits === 62;
 
@@ -286,8 +292,8 @@
     }
     el("permalink").href = permalink;
 
-    if (urlcodepoint) {
-      el("changewarning").style.display = (value !== urlcodepoint) ? "inline" : "none";
+    if (urlcodepoint && value !== urlcodepoint) {
+      el("changewarning").style.display = "inline";
       urlcodepoint = null;
     }
 
@@ -297,7 +303,7 @@
   async function pick() {
     let f = el("field");
     let cp = el("codepoint");
-    cp.classList.remove("error");
+    resetDecoration(cp);
     if (el("seed").value !== "") {
       const field = f.value;
       const rule = await rules[field];
