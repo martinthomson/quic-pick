@@ -10,6 +10,18 @@
       font-family: sans-serif;
     }
 
+    body {
+      max-width: 80ch;
+    }
+
+    h1 {
+      background-image: url("icon.svg");
+      background-repeat: no-repeat;
+      background-size: 1em 1em;
+      padding: 0 0.5em 0 1.5em;
+      margin: 0.5em;
+    }
+
     input,
     select {
       padding: 2px 4px;
@@ -54,7 +66,7 @@
 
 <body>
   <h1>Codepoint Selector</h1>
-  <p>If you are looking to use a new codepoint for a protocol, look no further.
+  <p>For QUIC and similar protocols, a deterministic and repeatable codepoint selection tool.
   <p>This understands the registries from
     <a href="https://datatracker.ietf.org/doc/html/rfc9000#section-22">Section 22</a> of
     <a href="https://datatracker.ietf.org/doc/html/rfc9000">QUIC</a>,
@@ -62,8 +74,7 @@
     <a href="https://datatracker.ietf.org/doc/html/rfc9114">HTTP/3</a>, and
     <a href="https://datatracker.ietf.org/doc/html/rfc9297#section-5.4">Section 5.4</a> of
     <a href="https://datatracker.ietf.org/doc/html/rfc9297">HTTP Datagrams and the Capsule Protocol</a>.
-  <p>The selection avoids selecting codepoints that are either reserved or already allocated.
-    The process is deterministic, which also means that it is verifiable.
+    The selection avoids selecting codepoints that are either reserved or already allocated.
   <table>
     <tr>
       <td>
@@ -294,8 +305,8 @@
 
     if (urlcodepoint && value !== urlcodepoint) {
       el("changewarning").style.display = "inline";
-      urlcodepoint = null;
     }
+    urlcodepoint = null;
 
     el("size-row").style.display = varint ? "table-row" : "none";
   }
