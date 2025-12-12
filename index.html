@@ -328,7 +328,7 @@
       const sz = document.querySelector('input[name="size"]:checked').value;
       permalink += ";size=" + sz;
       const max = 1n << BigInt(8 * parseInt(sz, 10) - 2);
-      overflow = value + count >= max;
+      overflow = value + count - 1n >= max;
     }
     el("overflow").style.display = overflow ? "block" : "none";
 
