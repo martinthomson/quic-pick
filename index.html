@@ -396,6 +396,7 @@
   }
 
   function loadHash() {
+    el("count").value = "1";
     decodeURIComponent(window.location.hash.substring(1)).split(";").forEach(kv => {
       const [k, v] = kv.split("=", 2);
       if (!k || !v) { return; }
