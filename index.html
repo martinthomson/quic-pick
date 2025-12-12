@@ -26,10 +26,10 @@
     select {
       padding: 2px 4px;
       margin: 2px 4px;
-    }
 
-    input:is(.error, :invalid) {
-      background-color: #faa;
+      &:is(.error, :invalid) {
+        background-color: #faa;
+      }
     }
 
     #field {
@@ -39,27 +39,37 @@
     td {
       padding: 4px 8px;
       vertical-align: text-top;
-    }
 
-    td:first-child {
-      min-width: 100px;
+      &:first-child {
+        min-width: 100px;
+      }
     }
 
     optgroup {
       font-style: normal;
     }
 
-    a#permalink[href^="h"] {
-      text-decoration: none;
+    a#permalink {
+      &[href^="h"] {
+        text-decoration: none;
+      }
+
+      &:not([href^="h"]) {
+        visibility: hidden;
+      }
     }
 
-    a#permalink:not([href^="h"]) {
-      visibility: hidden;
-    }
-
-    #changewarning {
-      background-color: #faa;
+    .warning {
+      display: none;
       padding: 0 5px;
+      margin-left: 20px;
+      font-style: italic;
+      color: #a11;
+
+      &::before {
+        font-style: normal;
+        content: "⚠️" / "warning: ";
+      }
     }
   </style>
 </head>
@@ -119,12 +129,21 @@
     </tr>
     <tr>
       <td>
+        <label for="count">Consecutive values:</label>
+      </td>
+      <td>
+        <input type="number" id="count" value="1" min="1" size="4">
+      </td>
+    </tr>
+    <tr>
+      <td>
         <label for="value">Code point:</label>
       </td>
       <td>
-        <input type="text" id="codepoint" readonly size="20" placeholder="Pick a seed" title="Click to copy codepoint">
+        <input type="text" id="codepoint" readonly size="40" placeholder="Pick a seed" title="Click to copy codepoint">
         <a id="permalink" title="Link to this configuration">🔗</a>
-        <span id="changewarning" style="display: none;">⚠️value updated⚠️</span>
+        <div id="changed" class="warning">a new value has been picked since the original was picked</div>
+        <div id="overflow" class="warning">the range of values overflow the selected type or size</div>
       </td>
     </tr>
   </table>
@@ -273,38 +292,50 @@
     capsule: { r: vi62g23mod41 },
   };
 
-  async function draw(f, bytes, field) {
+  async function draw(n, f, bytes, field) {
     const tries = 32;
     let r = rng();
-    for (let i = 0; i < tries; ++i) {
+    outer: for (let i = 0; i < tries; ++i) {
       const v = await f(r, bytes);
-      const taken = await isTaken(v, field);
-      console.log(`draw ${i + 1} for ${field}: ${v.toString(16)} (taken: ${taken})`);
-      if (!taken) {
-        return v;
+      for (let j = 0n; j < n; ++j) {
+        if (await isTaken(v + j, field)) {
+          console.log(`draw ${i + 1} for ${field}: ${v.toString(16)} taken@${(v + j).toString(16)} (offset ${j})`);
+          continue outer;
+        }
       }
+      return v;
     }
     throw `failed to generate a value for ${field} after ${tries} draws`;
   }
 
   function resetDecoration(cp) {
     cp.classList.remove("error");
-    el("changewarning").style.display = "none";
+    el("changed").style.display = "none";
+    el("overflow").style.display = "none";
     el("permalink").href = "";
   }
 
-  function updateDecoration(bits, value) {
+  function updateDecoration(bits, valuestr, value, count) {
     const varint = bits === 62;
 
     let permalink = window.location.origin + window.location.pathname + "#" +
       ["seed", "field", "codepoint"].map(k => `${k}=${encodeURIComponent(el(k).value)}`).join(";");
-    if (varint) {
-      permalink += ";size=" + document.querySelector('input[name="size"]:checked').value;
+    if (count > 1n) {
+      permalink += ";count=" + count;
     }
+    let overflow = false;
+    if (varint) {
+      const sz = document.querySelector('input[name="size"]:checked').value;
+      permalink += ";size=" + sz;
+      const max = 1n << BigInt(8 * parseInt(sz, 10) - 2);
+      overflow = value + count >= max;
+    }
+    el("overflow").style.display = overflow ? "block" : "none";
+
     el("permalink").href = permalink;
 
-    if (urlcodepoint && value !== urlcodepoint) {
-      el("changewarning").style.display = "inline";
+    if (urlcodepoint && valuestr !== urlcodepoint) {
+      el("changed").style.display = "block";
     }
     urlcodepoint = null;
 
@@ -321,18 +352,22 @@
       const bits = (rule.bits ?? 62);
       const byteElement = document.querySelector('input[name="size"]:checked');
       const bytes = parseInt(byteElement.value, 10);
+      const count = BigInt(parseInt(el("count").value, 10));
 
       try {
-        const v = await draw(rule.r, bytes, field);
+        const v = await draw(count, rule.r, bytes, field);
         const padlen = (bits === 62) ? (bytes * 2) : Math.ceil(bits / 4);
+        const pad = v => v.toString(16).padStart(padlen, "0");
         const vstr = v.toString(16).padStart(padlen, "0");
-        cp.value = "0x" + vstr;
-        updateDecoration(bits, cp.value);
+        cp.value = `0x${pad(v)}`;
+        if (count > 1n) {
+          cp.value += ` \u2013 0x${pad(v + count - 1n)}`;
+        }
+        updateDecoration(bits, cp.value, v, count);
       } catch (e) {
         console.warn(e);
         cp.classList.add("error");
-        cp.value = "error"
-        cp.title = e.toString();
+        cp.value = e.toString();
       }
     } else {
       cp.value = "";
@@ -394,7 +429,7 @@
       navigator.clipboard.writeText(e.target.href);
     });
 
-    for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8"]) {
+    for (const i of ["seed", "field", "size-1", "size-2", "size-4", "size-8", "count"]) {
       el(i).addEventListener("change", pick);
     }
     el("codepoint").addEventListener("click", e => {
