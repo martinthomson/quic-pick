@@ -222,6 +222,27 @@ export async function draw(n, seed, f, bytes, field, fetchFn) {
  *   that don't have a global fetch (Node < 18).
  * @returns {Promise<bigint>} The selected codepoint (start of range if count > 1).
  */
+/**
+ * Generate a permalink URL for a given codepoint selection.
+ * The URL can be used to verify the selection on the quic-pick website.
+ *
+ * @param {object} options
+ * @param {string} options.seed - Seed string used for selection.
+ * @param {string} options.field - Registry field name (e.g. 'frame', 'tp').
+ * @param {bigint} options.codepoint - The selected codepoint value.
+ * @param {number} [options.bytes=8] - Encoded size in bytes (1, 2, 4, or 8).
+ * @param {bigint} [options.count=1n] - Number of consecutive values.
+ * @param {string} [options.baseUrl] - Base URL of the quic-pick tool.
+ * @returns {string} A permalink URL.
+ */
+export function permalink({ seed, field, codepoint, bytes = 8, count = 1n, baseUrl = BASE_URL } = {}) {
+  const cpStr = `0x${codepoint.toString(16).padStart(bytes * 2, '0')}`;
+  let url = `${baseUrl}#seed=${encodeURIComponent(seed)};field=${field};codepoint=${encodeURIComponent(cpStr)}`;
+  if (count > 1n) url += `;count=${count}`;
+  url += `;size=${bytes}`;
+  return url;
+}
+
 export async function pick({ seed, field, bytes = 8, count = 1n, fetchFn } = {}) {
   if (!seed) { throw new Error('seed is required'); }
   if (!field) { throw new Error('field is required'); }
