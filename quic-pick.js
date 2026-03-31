@@ -211,18 +211,6 @@ export async function draw(n, seed, f, bytes, field, fetchFn) {
 }
 
 /**
- * Select a codepoint deterministically for a given seed and field type.
- *
- * @param {object} options
- * @param {string} options.seed - Seed string (e.g. 'draft-foo-bar-01_frame').
- * @param {string} options.field - Registry field name (e.g. 'frame', 'tp', 'version').
- * @param {number} [options.bytes=8] - Encoded size in bytes (1, 2, 4, or 8).
- * @param {number|bigint} [options.count=1] - Number of consecutive values needed.
- * @param {Function} [options.fetchFn] - fetch override; required in Node.js environments
- *   that don't have a global fetch (Node < 18).
- * @returns {Promise<bigint>} The selected codepoint (start of range if count > 1).
- */
-/**
  * Generate a permalink URL for a given codepoint selection.
  * The URL can be used to verify the selection on the quic-pick website.
  *
@@ -243,6 +231,18 @@ export function permalink({ seed, field, codepoint, bytes = 8, count = 1n, baseU
   return url;
 }
 
+/**
+ * Select a codepoint deterministically for a given seed and field type.
+ *
+ * @param {object} options
+ * @param {string} options.seed - Seed string (e.g. 'draft-foo-bar-01_frame').
+ * @param {string} options.field - Registry field name (e.g. 'frame', 'tp', 'version').
+ * @param {number} [options.bytes=8] - Encoded size in bytes (1, 2, 4, or 8).
+ * @param {number|bigint} [options.count=1] - Number of consecutive values needed.
+ * @param {Function} [options.fetchFn] - fetch override; required in Node.js environments
+ *   that don't have a global fetch (Node < 18).
+ * @returns {Promise<bigint>} The selected codepoint (start of range if count > 1).
+ */
 export async function pick({ seed, field, bytes = 8, count = 1n, fetchFn } = {}) {
   if (!seed) { throw new Error('seed is required'); }
   if (!field) { throw new Error('field is required'); }
