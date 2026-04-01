@@ -1,0 +1,22 @@
+name: "Tests"
+
+on:
+  push:
+    paths: ["*.js", "*.mjs", "*.xml"]
+  pull_request:
+    branches: [main]
+    paths: ["*.js", "*.mjs", "*.xml"]
+
+jobs:
+  test:
+    name: "Basic Tests"
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Checkout"
+      uses: actions/checkout@v6
+    - name: "Node Setup"
+      uses: actions/setup-node@v6
+      with:
+        node-version: latest
+    - name: "Test"
+      run: node test.mjs

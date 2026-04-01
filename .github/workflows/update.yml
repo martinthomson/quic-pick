@@ -1,4 +1,4 @@
-name: "Update Registries From IANA"
+name: "Update Registries"
 
 on:
   schedule:
@@ -8,12 +8,12 @@ on:
     paths: [".github/workflows/update.yml"]
 
 jobs:
-  build:
+  update:
     name: "Update Copies of IANA Registries"
     runs-on: ubuntu-latest
     steps:
     - name: "Checkout"
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: "Download Registries"
       run: |
         curl -sSLf https://www.iana.org/assignments/quic/quic.xml -o quic.xml
