@@ -236,7 +236,6 @@
       sel.textContent = s;
 
       function cleanupLabels() {
-        // const required: module scope is strict, undeclared vars throw
         for (const opt of f.options) {
           opt.textContent = cutLast(opt);
         }
